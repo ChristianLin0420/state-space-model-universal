@@ -5,6 +5,7 @@ model:
   d_state: 64
   dropout: 0.1
   max_seq_len: 2048  # Maximum sequence length
+  max_length: 16384  # Maximum sequence length for kernel pre-computation
   # SSM parameters
   hippo_method: "legendre"  # or "fourier"
   bidirectional: false  # for s4
@@ -14,7 +15,7 @@ model:
   expansion_factor: 2  # for mamba, mamba2
   conv_kernel: 4  # for mamba, mamba2
   selective_scan: true  # for mamba2
-  computation_mode: "conv"  # or "recurrent"
+  mode: "conv"  # "conv" for training, "recurrent" for streaming inference
   
 training:
   batch_size: 32
