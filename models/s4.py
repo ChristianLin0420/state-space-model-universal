@@ -59,7 +59,7 @@ class S4Layer(StateSpaceModel):
         self.dt = nn.Parameter(torch.exp(log_dt))
         
         # Initialize SSM parameters
-        A = hippo_initializer(d_state, method=hippo_method)
+        A, B = hippo_initializer(d_state, method=hippo_method)
         P = torch.randn(d_state, d_state) / math.sqrt(d_state)
         Q = torch.randn(d_state, d_state) / math.sqrt(d_state)
         self.Lambda = nn.Parameter(torch.diag(A))
@@ -67,7 +67,7 @@ class S4Layer(StateSpaceModel):
         self.Q = nn.Parameter(Q)
         
         # B and C matrices
-        self.B = nn.Parameter(torch.randn(d_model, d_state) / math.sqrt(d_state))
+        self.B = nn.Parameter(B)
         self.C = nn.Parameter(torch.randn(d_model, d_state) / math.sqrt(d_state))
         
         self.dropout = nn.Dropout(dropout)
