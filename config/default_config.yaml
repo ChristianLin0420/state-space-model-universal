@@ -7,7 +7,7 @@ model:
   max_seq_len: 2048  # Maximum sequence length
   max_length: 16384  # Maximum sequence length for kernel pre-computation
   # SSM parameters
-  hippo_method: "legendre"  # or "fourier"
+  hippo_method: "legS"  # one of: "legT", "lagT", "legS"
   bidirectional: false  # for s4
   dt_min: 0.001  # for s4, s5
   dt_max: 0.1  # for s4, s5
@@ -16,6 +16,7 @@ model:
   conv_kernel: 4  # for mamba, mamba2
   selective_scan: true  # for mamba2
   mode: "conv"  # "conv" for training, "recurrent" for streaming inference
+  hippo_theta: 1.0  # sliding window length (only used for LegT)
   
 training:
   batch_size: 32
