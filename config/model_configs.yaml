@@ -1,0 +1,38 @@
+# S4 Configuration
+s4:
+  type: "s4"
+  d_model: 256
+  d_state: 64
+  dropout: 0.1
+  bidirectional: false
+  dt_min: 0.001
+  dt_max: 0.1
+
+# S5 Configuration
+s5:
+  type: "s5"
+  d_model: 256
+  d_state: 64
+  dropout: 0.1
+  dt_min: 0.001
+  dt_max: 0.1
+  init_scale: 1.0
+
+# Mamba Configuration
+mamba:
+  type: "mamba"
+  d_model: 256
+  d_state: 64
+  dropout: 0.1
+  expansion_factor: 2
+  conv_kernel: 4
+
+# Mamba2 Configuration
+mamba2:
+  type: "mamba2"
+  d_model: 256
+  d_state: 64
+  dropout: 0.1
+  expansion_factor: 2
+  conv_kernel: 4
+  selective_scan: true 
