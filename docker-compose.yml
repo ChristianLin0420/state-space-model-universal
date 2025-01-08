@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  ssm:
+    build: .
+    image: state-space-model-universal
+    container_name: ssm-container
+    volumes:
+      # Mount code directory for development
+      - .:/app
+      # Mount data directory
+      - ./data:/app/data
+      # Mount checkpoints
+      - ./checkpoints:/app/checkpoints
+      # Mount wandb directory
+      - ~/.wandb:/root/.wandb
+    environment:
+      - WANDB_API_KEY=${WANDB_API_KEY}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # Keep container running
+    tty: true 

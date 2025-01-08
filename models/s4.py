@@ -271,7 +271,7 @@ class S4Layer(StateSpaceModel):
             return self.dropout(y), next_state
             
         else:  # convolutional mode
-            batch_size, L, _ = x.shape
+            _, L, _ = x.shape
             K = self._get_cached_kernel(L)
             
             # Apply convolution in frequency domain
