@@ -19,8 +19,8 @@ All models are implemented with HiPPO initialization for better performance.
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/state-space-models.git
-   cd state-space-models
+   git clone https://github.com/yourusername/state-space-model-universal.git
+   cd state-space-model-universal
    ```
 
 2. **Create a virtual environment (recommended):**
