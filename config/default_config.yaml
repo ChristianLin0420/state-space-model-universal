@@ -14,6 +14,7 @@ model:
   expansion_factor: 2  # for mamba, mamba2
   conv_kernel: 4  # for mamba, mamba2
   selective_scan: true  # for mamba2
+  computation_mode: "conv"  # or "recurrent"
   
 training:
   batch_size: 32
