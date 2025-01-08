@@ -6,9 +6,11 @@ from .s5 import S5Layer
 from .mamba import MambaLayer
 from .mamba2 import Mamba2Layer
 from .sequence_model import SequenceModel
+from .s4d import S4DLayer
 
 MODEL_REGISTRY = {
     "s4": S4Layer,
+    "s4d": S4DLayer,
     "s5": S5Layer,
     "mamba": MambaLayer,
     "mamba2": Mamba2Layer

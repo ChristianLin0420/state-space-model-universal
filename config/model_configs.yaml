@@ -36,3 +36,14 @@ mamba2:
   expansion_factor: 2
   conv_kernel: 4
   selective_scan: true 
+
+# S4D Configuration
+s4d:
+  type: "s4d"
+  d_model: 256
+  d_state: 64
+  dropout: 0.0
+  dt_min: 0.001
+  dt_max: 0.1
+  init_method: "inv"  # one of: "inv", "lin", "legs"
+  real_transform: true 
