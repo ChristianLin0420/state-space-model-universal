@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from einops import rearrange
 
 from .base import StateSpaceModel
-from .hippo import hippo_initializer
+from ..utils.hippo import hippo_initializer
 
 class S4Layer(StateSpaceModel):
     """Structured State Space Sequence (S4) model implementation.

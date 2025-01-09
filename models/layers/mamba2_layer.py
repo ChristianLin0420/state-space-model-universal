@@ -5,8 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange, repeat
 
-from .base import StateSpaceModel
-from .utils import LayerNorm, MLP
+from ..base import StateSpaceModel
+from ..utils.mlp import LayerNorm, MLP
 
 class Mamba2Layer(StateSpaceModel):
     """Mamba2 model implementation with improved architecture.

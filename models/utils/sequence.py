@@ -2,7 +2,7 @@ from typing import Optional, List, Type, Tuple
 import torch
 import torch.nn as nn
 
-from .base import StateSpaceModel
+from ..base import StateSpaceModel
 from .utils import PositionalEmbedding
 
 class SequenceModel(nn.Module):

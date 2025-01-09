@@ -1,5 +1,5 @@
 model:
-  type: "s4"  # One of: s4, s5, mamba, mamba2
+  type: "s4"  # One of: s4, s5, mamba, mamba2, s4d
   num_layers: 4  # Number of layers in the model
   d_model: 256
   d_state: 64
@@ -22,9 +22,12 @@ training:
   batch_size: 32
   learning_rate: 0.001
   max_epochs: 100
-  optimizer: "adam"
-  scheduler: "cosine"
-  warmup_steps: 1000
+  optimizer: "adamw"  # one of: adam, adamw
+  weight_decay: 0.01  # L2 regularization
+  scheduler:
+    type: "cosine"  # one of: cosine, linear, constant
+    warmup_steps: 1000
+    min_lr: 1.0e-6
   gradient_clip_val: 0.5
   
 data:

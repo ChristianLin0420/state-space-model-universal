@@ -22,10 +22,12 @@ s5:
 mamba:
   type: "mamba"
   d_model: 256
-  d_state: 64
+  d_state: 16
   dropout: 0.1
   expansion_factor: 2
   conv_kernel: 4
+  num_blocks: 4
+  max_seq_len: 2048
 
 # Mamba2 Configuration
 mamba2:
