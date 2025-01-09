@@ -8,12 +8,14 @@ Available SSM Layers:
 - S4DLayer: Diagonal State Space Model
 - S5Layer: Simplified State Space Model
 - MambaLayer: Selective State Space Model
+- Mamba2Layer: State Space Duality Model (Sequential/Parallel)
 - TransformerLayer: Transformer Layer
 
 Available Architectures:
 - H3Model: SSM with convolution and gating
 - GatedMLPModel: Optional SSM with parallel gating
 - MambaModel: SSM with selective scan mechanism
+- Mamba2Model: SSM with dual sequential/parallel modes
 - TransformerModel: Transformer Model
 
 Example usage:
@@ -38,6 +40,16 @@ model = create_model(
     num_layers=4
 )
 
+# Create Mamba2 model with sequential mode
+model = create_model(
+    architecture="mamba2",
+    ssm_layer="mamba2",
+    d_model=256,
+    d_state=16,
+    num_layers=4,
+    layer_kwargs={"block_type": "sequential"}  # or "parallel"
+)
+
 # Create Gated MLP model with S5 layer
 model = create_model(
     architecture="gmlp",
@@ -59,6 +71,7 @@ from .layers.s4_layer import S4Layer
 from .layers.s4d_layer import S4DLayer
 from .layers.s5_layer import S5Layer
 from .layers.mamba_layer import MambaLayer
+from .layers.mamba2_layer import Mamba2Layer
 from .layers.transformer_encoder_layer import TransformerEncoderLayer
 from .layers.transformer_decoder_layer import TransformerDecoderLayer
 
@@ -66,6 +79,7 @@ from .layers.transformer_decoder_layer import TransformerDecoderLayer
 from .architectures.h3 import H3Model
 from .architectures.gated_mlp import GatedMLPModel
 from .architectures.mamba import MambaModel
+from .architectures.mamba2 import Mamba2Model, SequentialMambaBlock, ParallelMambaBlock
 from .architectures.transformer import TransformerModel
 
 # Layer name to class mapping
@@ -74,6 +88,7 @@ SSM_LAYERS = {
     "s4d": S4DLayer,
     "s5": S5Layer,
     "mamba": MambaLayer,
+    "mamba2": Mamba2Layer,
 }
 
 # Architecture name to class mapping
@@ -81,12 +96,13 @@ ARCHITECTURES = {
     "h3": H3Model,
     "gmlp": GatedMLPModel,
     "mamba": MambaModel,
+    "mamba2": Mamba2Model,
     "transformer": TransformerModel,  # Standard encoder-decoder Transformer
 }
 
 def create_model(
-    architecture: Literal["h3", "gmlp", "mamba", "transformer"],
-    ssm_layer: Optional[Literal["s4", "s4d", "s5", "mamba"]] = None,
+    architecture: Literal["h3", "gmlp", "mamba", "mamba2", "transformer"],
+    ssm_layer: Optional[Literal["s4", "s4d", "s5", "mamba", "mamba2"]] = None,
     d_model: int = 256,
     d_state: int = 64,
     num_layers: int = 4,
@@ -107,7 +123,7 @@ def create_model(
         num_layers: Number of layers
         max_seq_len: Maximum sequence length
         dropout: Dropout rate
-        layer_kwargs: Additional arguments for layer
+        layer_kwargs: Additional arguments for layer (e.g., block_type for Mamba2)
         architecture_kwargs: Additional arguments for architecture
         
     Returns:
@@ -117,6 +133,7 @@ def create_model(
         >>> model = create_model("h3", "s4", d_model=256, d_state=64)
         >>> model = create_model("gmlp", ssm_layer=None)  # Pure MLP without SSM
         >>> model = create_model("transformer", num_layers=6)  # Standard Transformer
+        >>> model = create_model("mamba2", "mamba2", layer_kwargs={"block_type": "sequential"})
     """
     # Validate inputs
     if architecture not in ARCHITECTURES:
@@ -168,9 +185,10 @@ __all__ = [
     
     # SSM Layers
     "S4Layer",
-    "S4DLayer",
+    "S4DLayer", 
     "S5Layer",
     "MambaLayer",
+    "Mamba2Layer",
     
     # Transformer Layers
     "TransformerEncoderLayer",
@@ -180,5 +198,10 @@ __all__ = [
     "H3Model",
     "GatedMLPModel",
     "MambaModel",
+    "Mamba2Model",
     "TransformerModel",
+    
+    # Mamba2 Blocks
+    "SequentialMambaBlock",
+    "ParallelMambaBlock",
 ] 

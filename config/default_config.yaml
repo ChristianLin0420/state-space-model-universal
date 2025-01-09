@@ -1,5 +1,5 @@
 model:
-  type: "s4"  # One of: s4, s5, mamba, mamba2, s4d
+  type: "s4"  # One of: s4, s5, mamba, mamba2, s4d, transformer
   num_layers: 4  # Number of layers in the model
   d_model: 256
   d_state: 64
@@ -12,9 +12,19 @@ model:
   dt_min: 0.001  # for s4, s5
   dt_max: 0.1  # for s4, s5
   init_scale: 1.0  # for s5
-  expansion_factor: 2  # for mamba, mamba2
-  conv_kernel: 4  # for mamba, mamba2
+  # Mamba/Mamba2 parameters
+  d_conv: 4  # for mamba, mamba2
+  expand_factor: 2  # for mamba, mamba2
+  conv_kernel_size: 4  # for mamba, mamba2
   selective_scan: true  # for mamba2
+  block_type: "sequential"  # for mamba2: "sequential" or "parallel"
+  # Transformer parameters
+  nhead: 8  # for transformer
+  dim_feedforward: 1024  # for transformer
+  activation: "gelu"  # for transformer
+  layer_norm_eps: 1e-5  # for transformer
+  batch_first: true  # for transformer
+  norm_first: true  # for transformer
   mode: "conv"  # "conv" for training, "recurrent" for streaming inference
   hippo_theta: 1.0  # sliding window length (only used for LegT)
   

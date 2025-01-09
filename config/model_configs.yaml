@@ -35,9 +35,13 @@ mamba2:
   d_model: 256
   d_state: 64
   dropout: 0.1
-  expansion_factor: 2
-  conv_kernel: 4
-  selective_scan: true 
+  d_conv: 4
+  expand_factor: 2
+  conv_kernel_size: 4
+  num_layers: 4
+  max_seq_len: 2048
+  block_type: "sequential"  # one of: "sequential", "parallel"
+  selective_scan: true
 
 # S4D Configuration
 s4d:
@@ -49,3 +53,17 @@ s4d:
   dt_max: 0.1
   init_method: "inv"  # one of: "inv", "lin", "legs"
   real_transform: true 
+
+# Transformer Configuration
+transformer:
+  type: "transformer"
+  d_model: 256
+  nhead: 8
+  num_layers: 4
+  dim_feedforward: 1024
+  dropout: 0.1
+  activation: "gelu"
+  max_seq_len: 2048
+  layer_norm_eps: 1e-5
+  batch_first: true
+  norm_first: true 
