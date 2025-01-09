@@ -8,11 +8,13 @@ Available SSM Layers:
 - S4DLayer: Diagonal State Space Model
 - S5Layer: Simplified State Space Model
 - MambaLayer: Selective State Space Model
+- TransformerLayer: Transformer Layer
 
 Available Architectures:
 - H3Model: SSM with convolution and gating
 - GatedMLPModel: Optional SSM with parallel gating
 - MambaModel: SSM with selective scan mechanism
+- TransformerModel: Transformer Model
 
 Example usage:
 ```python
@@ -57,11 +59,14 @@ from .layers.s4_layer import S4Layer
 from .layers.s4d_layer import S4DLayer
 from .layers.s5_layer import S5Layer
 from .layers.mamba_layer import MambaLayer
+from .layers.transformer_encoder_layer import TransformerEncoderLayer
+from .layers.transformer_decoder_layer import TransformerDecoderLayer
 
 # Import all architectures
 from .architectures.h3 import H3Model
 from .architectures.gated_mlp import GatedMLPModel
 from .architectures.mamba import MambaModel
+from .architectures.transformer import TransformerModel
 
 # Layer name to class mapping
 SSM_LAYERS = {
@@ -76,10 +81,11 @@ ARCHITECTURES = {
     "h3": H3Model,
     "gmlp": GatedMLPModel,
     "mamba": MambaModel,
+    "transformer": TransformerModel,  # Standard encoder-decoder Transformer
 }
 
 def create_model(
-    architecture: Literal["h3", "gmlp", "mamba"],
+    architecture: Literal["h3", "gmlp", "mamba", "transformer"],
     ssm_layer: Optional[Literal["s4", "s4d", "s5", "mamba"]] = None,
     d_model: int = 256,
     d_state: int = 64,
@@ -91,15 +97,17 @@ def create_model(
 ) -> Any:
     """Create a model with specified architecture and SSM layer.
     
+    Note: Transformer architecture does not use SSM layers.
+    
     Args:
         architecture: Type of architecture to use
-        ssm_layer: Type of SSM layer to use (optional for GMLP)
+        ssm_layer: Type of SSM layer to use (optional for GMLP, not used for Transformer)
         d_model: Model dimension
-        d_state: State dimension
+        d_state: State dimension (not used for Transformer)
         num_layers: Number of layers
         max_seq_len: Maximum sequence length
         dropout: Dropout rate
-        layer_kwargs: Additional arguments for SSM layer
+        layer_kwargs: Additional arguments for layer
         architecture_kwargs: Additional arguments for architecture
         
     Returns:
@@ -108,38 +116,47 @@ def create_model(
     Example:
         >>> model = create_model("h3", "s4", d_model=256, d_state=64)
         >>> model = create_model("gmlp", ssm_layer=None)  # Pure MLP without SSM
-        >>> model = create_model("mamba", "mamba", layer_kwargs={"init_method": "inv"})
+        >>> model = create_model("transformer", num_layers=6)  # Standard Transformer
     """
     # Validate inputs
     if architecture not in ARCHITECTURES:
         raise ValueError(f"Unknown architecture: {architecture}. "
                         f"Available: {list(ARCHITECTURES.keys())}")
     
-    if ssm_layer is not None and ssm_layer not in SSM_LAYERS:
+    if architecture != "transformer" and ssm_layer is not None and ssm_layer not in SSM_LAYERS:
         raise ValueError(f"Unknown SSM layer: {ssm_layer}. "
                         f"Available: {list(SSM_LAYERS.keys())}")
     
-    # Get architecture and layer classes
+    # Get architecture class
     arch_cls = ARCHITECTURES[architecture]
+    
+    # Special handling for Transformer
+    if architecture == "transformer":
+        if ssm_layer is not None:
+            raise ValueError("Transformer architecture does not use SSM layers")
+        return arch_cls(
+            d_model=d_model,
+            num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers,
+            dropout=dropout,
+            max_seq_len=max_seq_len,
+            **(architecture_kwargs or {})
+        )
+    
+    # Get layer class for SSM architectures
     layer_cls = SSM_LAYERS.get(ssm_layer) if ssm_layer else None
     
-    # Prepare kwargs
-    layer_kwargs = layer_kwargs or {}
-    architecture_kwargs = architecture_kwargs or {}
-    
     # Create model
-    model = arch_cls(
+    return arch_cls(
         ssm_layer_class=layer_cls,
         d_model=d_model,
         d_state=d_state,
         num_layers=num_layers,
         max_seq_len=max_seq_len,
         dropout=dropout,
-        layer_kwargs=layer_kwargs,
-        **architecture_kwargs
+        layer_kwargs=layer_kwargs or {},
+        **(architecture_kwargs or {})
     )
-    
-    return model
 
 # For convenience, also export classes directly
 __all__ = [
@@ -155,8 +172,13 @@ __all__ = [
     "S5Layer",
     "MambaLayer",
     
+    # Transformer Layers
+    "TransformerEncoderLayer",
+    "TransformerDecoderLayer",
+    
     # Architectures
     "H3Model",
     "GatedMLPModel",
     "MambaModel",
+    "TransformerModel",
 ] 
