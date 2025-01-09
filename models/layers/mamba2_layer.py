@@ -1,169 +1,239 @@
-from typing import Optional, Tuple
+"""Mamba2 (State Space Duality) Layer Implementation.
+
+This module implements the Mamba2 layer based on the State Space Duality (SSD) framework.
+The implementation follows the block matrix decomposition algorithm with four steps:
+1. Intra-chunk outputs (diagonal blocks)
+2. Chunk states (right term of low-rank factorization)
+3. Pass states (inter-chunk SSM recurrence)
+4. Output states (left term of low-rank factorization)
+
+Reference:
+    https://goombalab.github.io/blog/2024/mamba2-part3-algorithm/
+"""
+
 import math
+from typing import Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange, repeat
 
-from ..base import StateSpaceModel
-from ..utils.mlp import LayerNorm, MLP
+from ..utils.mlp import MLP
 
-class Mamba2Layer(StateSpaceModel):
-    """Mamba2 model implementation with improved architecture.
+def segsum(x: torch.Tensor) -> torch.Tensor:
+    """Compute segment sums in log space for numerical stability.
     
-    Enhancements over Mamba:
-    - Parallel state computation
-    - Improved gating mechanism
-    - Layer normalization
+    This computes sums over segments [i:j] without using subtraction,
+    which is important for numerical stability of the SSM.
+    
+    Args:
+        x (torch.Tensor): Input tensor
+        
+    Returns:
+        torch.Tensor: Segment sums in log space
+    """
+    T = x.size(-1)
+    x_cumsum = torch.cumsum(x, dim=-1)
+    x_segsum = x_cumsum[..., :, None] - x_cumsum[..., None, :]
+    mask = torch.tril(torch.ones(T, T, device=x.device, dtype=bool), diagonal=0)
+    x_segsum = x_segsum.masked_fill(~mask, -torch.inf)
+    return x_segsum
+
+class Mamba2Layer(nn.Module):
+    """Mamba2 layer implementing the State Space Duality (SSD) mechanism.
+    
+    The layer uses a block matrix decomposition algorithm that combines:
+    1. Hardware-efficient matrix multiplications for most operations
+    2. Linear-time SSM processing for cross-chunk connections
+    
+    Args:
+        d_model (int): Model dimension
+        d_state (int): State dimension (N)
+        d_head (int): Head dimension (P), analogous to attention head size
+        expand_factor (int, optional): Expansion factor for input projection. Defaults to 2.
+        dt_rank (int, optional): Rank for delta (timestep) projection. Defaults to 8.
+        dt_min (float, optional): Minimum delta value. Defaults to 0.001.
+        dt_max (float, optional): Maximum delta value. Defaults to 0.1.
+        dt_init (str, optional): Delta initialization method ['random', 'uniform']. Defaults to 'random'.
+        dt_scale (float, optional): Scale factor for delta initialization. Defaults to 1.0.
+        block_size (int, optional): Size of blocks for chunked processing. Defaults to 64.
+        bias (bool, optional): Whether to use bias in linear layers. Defaults to False.
+        dropout (float, optional): Dropout rate. Defaults to 0.0.
     """
     
     def __init__(
         self,
         d_model: int,
         d_state: int,
-        dropout: float = 0.1,
-        expansion_factor: int = 2,
-        conv_kernel: int = 4,
-        selective_scan: bool = True,
-    ) -> None:
-        super().__init__(d_model, d_state, dropout)
+        d_head: int = 64,
+        expand_factor: int = 2,
+        dt_rank: int = 8,
+        dt_min: float = 0.001,
+        dt_max: float = 0.1,
+        dt_init: str = 'random',
+        dt_scale: float = 1.0,
+        block_size: int = 64,
+        bias: bool = False,
+        dropout: float = 0.0,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.d_state = d_state
+        self.d_head = d_head
+        self.expand_factor = expand_factor
+        self.dt_rank = dt_rank
+        self.block_size = block_size
         
-        self.d_inner = expansion_factor * d_model
-        self.conv_kernel = conv_kernel
-        self.selective_scan = selective_scan
-        
-        # Normalization layers
-        self.norm1 = LayerNorm(d_model)
-        self.norm2 = LayerNorm(self.d_inner)
-        
-        # Input projection and expansion
-        self.in_proj = nn.Linear(d_model, self.d_inner * 4)  # x, delta, gamma, beta
-        
-        # Convolutional layer for local context
-        self.conv = nn.Conv1d(
-            in_channels=self.d_inner,
-            out_channels=self.d_inner,
-            kernel_size=conv_kernel,
-            padding=conv_kernel - 1,
-            groups=self.d_inner
-        )
+        # Input projection
+        self.d_inner = int(expand_factor * d_model)
+        self.in_proj = nn.Linear(d_model, self.d_inner, bias=bias)
         
         # SSM parameters
-        self.A = nn.Parameter(torch.randn(self.d_inner, d_state, d_state) / math.sqrt(d_state))
-        self.B = nn.Parameter(torch.randn(self.d_inner, d_state) / math.sqrt(d_state))
-        self.C = nn.Parameter(torch.randn(self.d_inner, d_state) / math.sqrt(d_state))
-        self.D = nn.Parameter(torch.randn(self.d_inner) / math.sqrt(self.d_inner))
+        self.A_log = nn.Parameter(torch.randn(1))  # Scalar A (shared across time)
+        self.B = nn.Parameter(torch.randn(d_state))
+        self.C = nn.Parameter(torch.randn(d_state))
+        
+        # Delta (timestep) parameters
+        self.dt_proj = nn.Linear(self.d_inner, dt_rank, bias=False)
+        self.dt_scale = dt_scale
+        self.register_buffer('dt_init_bound', torch.tensor([dt_min, dt_max]))
         
         # Output projection
-        self.out_proj = nn.Linear(self.d_inner, d_model)
-        
-        # Feed-forward network
-        self.mlp = MLP(d_model, expansion_factor=4, dropout=dropout)
-        
-        # Dropout
+        self.out_proj = nn.Linear(self.d_inner, d_model, bias=bias)
         self.dropout = nn.Dropout(dropout)
         
-    def _selective_scan(
+        self._init_weights(dt_init)
+    
+    def _init_weights(self, dt_init: str):
+        """Initialize layer weights.
+        
+        Args:
+            dt_init (str): Delta initialization method ['random', 'uniform']
+        """
+        # Initialize A to be stable (negative real part)
+        with torch.no_grad():
+            self.A_log.data.uniform_(-2, -1)
+        
+        # Initialize B and C using Gaussian
+        nn.init.normal_(self.B, std=0.1)
+        nn.init.normal_(self.C, std=0.1)
+        
+        # Initialize delta projection
+        if dt_init == 'random':
+            nn.init.normal_(self.dt_proj.weight, std=0.1)
+        else:  # uniform
+            nn.init.uniform_(self.dt_proj.weight, -0.1, 0.1)
+    
+    def _compute_delta(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute input-dependent timesteps (delta).
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (B, L, D)
+            
+        Returns:
+            torch.Tensor: Delta tensor of shape (B, L)
+        """
+        dt = self.dt_proj(x)  # (B, L, R)
+        dt = torch.sigmoid(dt) * self.dt_scale  # Scale to [0, dt_scale]
+        dt = dt * (self.dt_init_bound[1] - self.dt_init_bound[0]) + self.dt_init_bound[0]
+        return dt.mean(dim=-1)  # Average across rank dimension
+    
+    def _ssd_forward(
         self,
         x: torch.Tensor,
         delta: torch.Tensor,
-        gamma: torch.Tensor,
-        beta: torch.Tensor,
-        state: Optional[torch.Tensor] = None
+        initial_state: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Perform selective scan operation.
+        """Forward pass using the SSD block matrix decomposition algorithm.
         
         Args:
-            x: Input tensor
-            delta: Time step modulation
-            gamma: Output modulation
-            beta: State modulation
-            state: Optional previous state
+            x (torch.Tensor): Input tensor of shape (B, L, H, P)
+            delta (torch.Tensor): Timestep tensor of shape (B, L, H)
+            initial_state (Optional[torch.Tensor]): Initial state. Defaults to None.
             
         Returns:
-            tuple: (output, new_state)
+            Tuple[torch.Tensor, torch.Tensor]: Output tensor and final state
         """
-        batch_size, seq_len, _ = x.shape
+        # Ensure sequence length is divisible by block size
+        B, L, H, P = x.shape
+        assert L % self.block_size == 0, f"Sequence length must be divisible by block_size {self.block_size}"
         
-        if state is None:
-            state = self.init_state(batch_size)
-            
-        # Prepare outputs
-        outputs = []
-        next_state = state
+        # Rearrange into blocks/chunks
+        x = rearrange(x, 'b (c l) h p -> b c l h p', l=self.block_size)
+        delta = rearrange(delta, 'b (c l) h -> b h c l', l=self.block_size)
         
-        for t in range(seq_len):
-            # Current timestep tensors
-            xt = x[:, t]
-            dt = torch.sigmoid(delta[:, t])
-            gt = torch.sigmoid(gamma[:, t])
-            bt = torch.sigmoid(beta[:, t])
-            
-            # State space computation
-            y = torch.einsum('bd,md->bm', next_state, self.C)
-            y = y + self.D * xt
-            
-            # Gated update with state modulation
-            y = gt * y + (1 - gt) * xt
-            outputs.append(y)
-            
-            # Update state with input and state modulation
-            dA = torch.matrix_exp(self.A * dt.unsqueeze(-1).unsqueeze(-1))
-            next_state = bt * (
-                torch.einsum('bmd,bd->bm', dA, next_state) + 
-                torch.einsum('bd,md->bm', xt.unsqueeze(-1), self.B)
-            ) + (1 - bt) * next_state
-            
-        return torch.stack(outputs, dim=1), next_state
+        # Compute cumulative sums for A
+        A = torch.exp(self.A_log)
+        A_cumsum = torch.cumsum(delta, dim=-1)
         
+        # Step 1: Compute intra-chunk outputs (diagonal blocks)
+        L = torch.exp(segsum(delta))  # Lower triangular matrix
+        Y_diag = torch.einsum('bclhn,bcshn,bhcls,bcshp->bclhp',
+                            self.C.expand_as(x),
+                            self.B.expand_as(x),
+                            L,
+                            x)
+        
+        # Step 2: Compute chunk states (right term)
+        decay_states = torch.exp((A_cumsum[..., -1:] - A_cumsum))
+        states = torch.einsum('bclhn,bhcl,bclhp->bchpn',
+                           self.B.expand_as(x),
+                           decay_states,
+                           x)
+        
+        # Step 3: Compute inter-chunk SSM recurrence
+        if initial_state is None:
+            initial_state = torch.zeros_like(states[:, :1])
+        states = torch.cat([initial_state, states], dim=1)
+        decay_chunk = torch.exp(segsum(F.pad(A_cumsum[..., -1], (1, 0))))
+        new_states = torch.einsum('bhzc,bchpn->bzhpn',
+                               decay_chunk,
+                               states)
+        states, final_state = new_states[:, :-1], new_states[:, -1]
+        
+        # Step 4: Compute state -> output conversion
+        state_decay_out = torch.exp(A_cumsum)
+        Y_off = torch.einsum('bclhn,bchpn,bhcl->bclhp',
+                          self.C.expand_as(x),
+                          states,
+                          state_decay_out)
+        
+        # Combine diagonal and off-diagonal terms
+        Y = rearrange(Y_diag + Y_off, 'b c l h p -> b (c l) h p')
+        
+        return Y, final_state
+    
     def forward(
         self,
         x: torch.Tensor,
-        state: Optional[torch.Tensor] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass of Mamba2.
+        state: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """Forward pass using the SSD algorithm.
         
         Args:
-            x: Input tensor of shape (batch_size, seq_len, d_model)
-            state: Optional previous state
+            x (torch.Tensor): Input tensor of shape (B, L, D)
+            state (Optional[torch.Tensor]): Initial state. Defaults to None.
             
         Returns:
-            tuple: (output, new_state)
+            Tuple[torch.Tensor, Optional[torch.Tensor]]: Output tensor and final state
         """
-        # Input normalization
-        x = self.norm1(x)
+        # Project input
+        x = self.in_proj(x)
         
-        # Project and split input
-        x_proj = self.in_proj(x)
-        x_proj = rearrange(x_proj, 'b l (n d) -> n b l d', n=4)
-        x_in, delta, gamma, beta = x_proj
+        # Reshape for multi-head processing
+        B, L, D = x.shape
+        x = rearrange(x, 'b l (h p) -> b l h p', h=self.d_head)
         
-        # Apply convolution for local context
-        x_conv = rearrange(x_in, 'b l d -> b d l')
-        x_conv = self.conv(x_conv)[..., :x.size(1)]
-        x_conv = rearrange(x_conv, 'b d l -> b l d')
-        x_conv = self.norm2(x_conv)
+        # Compute input-dependent timesteps
+        delta = self._compute_delta(x)
         
-        # Apply selective scan
-        output, next_state = self._selective_scan(x_conv, delta, gamma, beta, state)
+        # Apply SSD algorithm
+        output, final_state = self._ssd_forward(x, delta, state)
         
-        # Project back to original dimension
+        # Reshape and project output
+        output = rearrange(output, 'b l h p -> b l (h p)')
         output = self.out_proj(output)
         output = self.dropout(output)
         
-        # Residual connection and MLP
-        output = x + output
-        output = output + self.mlp(output)
-        
-        return output, next_state
-        
-    def init_state(self, batch_size: int) -> torch.Tensor:
-        """Initialize the state of the model.
-        
-        Args:
-            batch_size: Batch size
-            
-        Returns:
-            Initial state tensor
-        """
-        return torch.zeros(batch_size, self.d_state, device=self.A.device) 
+        return output, final_state 
