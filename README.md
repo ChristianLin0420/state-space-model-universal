@@ -1,78 +1,367 @@
 # State Space Model Universal
 
+<div align="center">
+
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/pytorch-2.0%2B-ee4c2c.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A PyTorch implementation exploring and unifying various State Space Models (SSMs) and Transformer architectures for sequence modeling tasks. This research project investigates different sequence modeling approaches and their combinations, aiming to provide insights into their relative strengths and applications.
+
+[Overview](#introduction) •
+[Models](#features) •
+[Setup](#installation) •
+[Examples](#usage) •
+[Contributing](#contributing)
+
+</div>
+
+---
 
 ## Introduction
 
-State Space Models and Transformers represent two major approaches to sequence modeling. This project explores several key innovations in sequence modeling research:
+This research project explores and implements various state-of-the-art sequence modeling approaches, focusing on two major paradigms:
 
-- **S4 (Structured State Space)**: The foundational SSM architecture that introduced HiPPO-based initialization, enabling efficient modeling of long-range dependencies through a structured state space approach.
+### State Space Models (SSMs)
+SSMs represent a promising direction in sequence modeling research:
+- **Linear Time Complexity**: O(N) processing for sequences of length N
+- **Efficient Long-range Modeling**: Structured state representations for capturing dependencies
+- **Theoretical Foundations**: Based on continuous-time dynamical systems
+- **Hardware Efficiency**: Particularly well-suited for modern accelerators
 
-- **S4D (Diagonal State Space)**: A simplified variant that uses diagonal state matrices, significantly reducing computational complexity while maintaining performance through careful parameterization and initialization strategies.
+### Transformers
+The established baseline for sequence modeling, Transformers provide:
+- **Parallel Processing**: Efficient batch processing of sequence elements
+- **Global Context**: Direct modeling of relationships between any positions
+- **Flexible Representations**: Self-attention mechanism for adaptive feature extraction
+- **Proven Effectiveness**: State-of-the-art results across various domains
 
-- **S5 (Simplified State Space)**: Further optimization of the S4 architecture, focusing on practical efficiency while preserving the essential mathematical properties that make SSMs effective.
+This project aims to:
+- ✨ Implement and compare different sequence modeling architectures
+- 🔧 Explore combinations of SSMs and attention mechanisms
+- 🔄 Investigate hybrid approaches and their effectiveness
+- 📊 Provide empirical insights into model behaviors
 
-- **Mamba**: A recent advancement introducing selective state spaces with linear attention, combining the efficiency of SSMs with the adaptability of attention mechanisms.
+### Key Implementations
 
-- **Transformer**: The standard self-attention based architecture, serving as both a baseline and a component for hybrid approaches.
+Our project includes several state-of-the-art architectures:
 
-Our implementation focuses on:
-- Investigating the interaction between SSMs and attention mechanisms
-- Understanding the impact of various initialization schemes
-- Exploring hybrid architectures that combine different approaches
+#### State Space Models
+- **S4 (Structured State Space)**
+  - HiPPO-based initialization for enhanced long-range modeling
+  - Structured parameterization for stability and expressiveness
+  - Bidirectional processing capability
 
-## Model Architecture
+- **S4D (Diagonal State Space)**
+  - Optimized diagonal state matrices
+  - Improved training efficiency
+  - Maintained performance with reduced complexity
 
-### Core Implementations
-Each variant is implemented as a standalone layer, capturing its unique theoretical contributions:
+- **S5 (Simplified State Space)**
+  - Streamlined architecture for practical applications
+  - Reduced parameter count without sacrificing capability
+  - Enhanced numerical stability
 
-- `S4Layer`: 
-  - Implements the original structured state space formulation
-  - Uses HiPPO initialization for enhanced long-range modeling
-  - Supports both convolutional and recurrent modes
+- **Mamba**
+  - Selective state space mechanism
+  - Data-dependent sparsity
+  - Linear-time attention alternative
 
-- `S4DLayer`: 
-  - Implements diagonal state matrices for efficiency
-  - Features multiple initialization schemes (inverse, linear, legs)
-  - Optimized for faster training and inference
+#### Hybrid Approaches
+- **H3**: Experimental combination of SSMs with convolution and gating
+- **Gated MLP**: Investigation of SSM components with MLP architectures
 
-- `S5Layer`: 
-  - Simplified version of S4 focusing on practical efficiency
-  - Direct port of the JAX reference implementation
-  - Maintains key mathematical properties while reducing complexity
+---
 
-- `MambaLayer`: 
-  - Implements selective state space mechanism
-  - Features S4D-style initialization options
-  - Optimized for linear-time sequence processing
+## Features
 
-- `TransformerLayer`:
-  - Standard multi-head self-attention mechanism
-  - Includes position-wise feed-forward network
-  - Supports flexible attention configurations
+### State Space Models (SSMs)
+Our SSM implementations provide:
+- Efficient sequence processing with linear complexity
+- Multiple initialization schemes for different use cases
+- Comprehensive configuration options for research
+- Built-in support for both training and inference
 
-### Architecture Variants
-We explore several architectural approaches:
+### Transformer Components
+The Transformer implementation offers:
+- Full encoder-decoder architecture with modern improvements
+- Flexible attention patterns and masking
+- Optimized multi-head attention implementation
+- Customizable position embeddings
 
-- `H3Model`: 
-  - Combines SSMs with convolution and gating
-  - Designed for hierarchical sequence processing
-  - Effective for language modeling tasks
+### Architectures
+Each architecture is designed for:
+- Modular composition of different components
+- Easy experimentation with hybrid approaches
+- Efficient scaling to different model sizes
+- Research-friendly configuration options
 
-- `GatedMLPModel`: 
-  - Flexible architecture supporting optional SSM integration
-  - Can function as pure MLP or hybrid model
-  - Useful for ablation studies
+---
 
-- `MambaModel`: 
-  - Optimized for selective state space operations
-  - Features parallel processing capabilities
-  - Efficient for long sequence modeling
+## Installation
 
-- `TransformerModel`:
-  - Standard Transformer encoder architecture
-  - Supports various attention mechanisms
-  - Useful for comparison and hybrid experiments
+### Prerequisites
+Ensure your system meets these requirements:
+- Python 3.8 or higher
+- PyTorch 2.0 or higher
+- CUDA toolkit (optional, for GPU support)
+- 4GB+ RAM for basic usage, 8GB+ recommended
+
+### Basic Installation
+For most users, the following is sufficient:
+```bash
+pip install -e .
+```
+
+### Development Installation
+For contributors and researchers:
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/state-space-model-universal.git
+cd state-space-model-universal
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+---
+
+## Usage
+
+### Creating Models
+
+The library provides several ways to create and customize models:
+
+#### Basic Model Creation
+For quick experimentation and standard use cases:
+```python
+from state_space_model_universal import create_model
+
+# Create H3 model with S4 layer
+model = create_model(
+    architecture="h3",
+    ssm_layer="s4",
+    d_model=256,
+    d_state=64,
+    num_layers=4
+)
+
+# Create Mamba model
+model = create_model(
+    architecture="mamba",
+    ssm_layer="mamba",
+    d_model=256,
+    d_state=16,
+    num_layers=4
+)
+
+# Create standard Transformer
+model = create_model(
+    architecture="transformer",
+    d_model=512,
+    num_layers=6,  # Same number for encoder and decoder
+    max_seq_len=2048
+)
+```
+
+#### Advanced Configuration
+For research and specialized applications:
+```python
+# H3 model with custom layer settings
+model = create_model(
+    architecture="h3",
+    ssm_layer="s4d",
+    d_model=512,
+    d_state=64,
+    num_layers=6,
+    layer_kwargs={
+        "init_method": "legs",  # S4D initialization method
+        "bidirectional": True,  # Enable bidirectional processing
+    },
+    architecture_kwargs={
+        "activation": "gelu",
+        "dropout": 0.1,
+    }
+)
+
+# Transformer with custom attention settings
+model = create_model(
+    architecture="transformer",
+    d_model=768,
+    num_layers=12,
+    architecture_kwargs={
+        "num_heads": 12,
+        "d_ff": 3072,
+        "attention_dropout": 0.1,
+        "max_seq_len": 4096,
+    }
+)
+```
+
+### Using Individual Components
+
+#### SSM Layers
+Fine-grained control over SSM components:
+```python
+from state_space_model_universal import S4Layer, MambaLayer
+
+# S4 layer with advanced configuration
+s4 = S4Layer(
+    d_model=256,
+    d_state=64,
+    bidirectional=True,
+    dropout=0.1,
+    init_method="legs"
+)
+output = s4(input_tensor)
+
+# Mamba layer with custom settings
+mamba = MambaLayer(
+    d_model=256,
+    d_state=16,
+    expand_factor=2,
+    init_method="inv"
+)
+output = mamba(input_tensor)
+```
+
+#### Transformer Components
+Modular Transformer building blocks:
+```python
+from state_space_model_universal import (
+    TransformerEncoderLayer,
+    TransformerDecoderLayer,
+    TransformerModel
+)
+
+# Single encoder layer with custom settings
+encoder_layer = TransformerEncoderLayer(
+    d_model=512,
+    num_heads=8,
+    d_ff=2048,
+    dropout=0.1,
+    attention_dropout=0.1
+)
+encoded = encoder_layer(x, mask=None)
+
+# Single decoder layer with memory
+decoder_layer = TransformerDecoderLayer(
+    d_model=512,
+    num_heads=8,
+    d_ff=2048,
+    dropout=0.1
+)
+decoded = decoder_layer(x, memory, tgt_mask=None, memory_mask=None)
+
+# Full Transformer with custom configuration
+transformer = TransformerModel(
+    d_model=512,
+    num_encoder_layers=6,
+    num_decoder_layers=6,
+    num_heads=8,
+    d_ff=2048,
+    dropout=0.1,
+    attention_dropout=0.1,
+    max_seq_len=2048
+)
+
+# Forward pass with masking
+src_mask = torch.ones(batch_size, src_len, src_len)  # Optional source mask
+tgt_mask = torch.triu(torch.ones(batch_size, tgt_len, tgt_len), diagonal=1)  # Causal mask
+output = transformer(src, tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+```
+
+### Training and Evaluation
+
+Standard PyTorch training loop with our models:
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# Initialize model and training components
+model = create_model("h3", "s4", d_model=256)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.AdamW(model.parameters(), lr=1e-3)
+
+# Training loop
+model.train()
+for epoch in range(num_epochs):
+    for batch in dataloader:
+        optimizer.zero_grad()
+        output = model(batch.input)
+        loss = criterion(output, batch.target)
+        loss.backward()
+        optimizer.step()
+
+# Evaluation
+model.eval()
+with torch.no_grad():
+    for batch in val_dataloader:
+        output = model(batch.input)
+        # Compute metrics
+```
+
+---
+
+## Architecture Details
+
+### State Space Models
+Each SSM variant offers unique advantages:
+
+- **S4**: 
+  - Full state space model with structured matrices
+  - HiPPO-based initialization for enhanced modeling
+  - Complex-valued state representations
+
+- **S4D**: 
+  - Diagonal version of S4 for improved efficiency
+  - Multiple initialization options
+  - Real-valued computations
+
+- **S5**: 
+  - Simplified version with similar performance
+  - Reduced parameter count
+  - Enhanced training stability
+
+- **Mamba**: 
+  - Selective state space model
+  - Data-dependent sparsity
+  - Linear-time attention mechanism
+
+### Transformer Architecture
+Our Transformer implementation follows the standard encoder-decoder architecture with modern improvements:
+
+#### Encoder
+- **Self-attention**: Multi-head attention for input sequence relationships
+- **Position-wise FFN**: Two-layer feed-forward network
+- **Layer Norm**: Pre-norm configuration for stability
+- **Residual Connections**: For gradient flow
+
+#### Decoder
+- **Masked Self-attention**: For autoregressive generation
+- **Cross-attention**: Attention to encoder outputs
+- **Position-wise FFN**: Similar to encoder
+- **Layer Norm & Residuals**: For training stability
+
+### Hybrid Architectures
+Novel combinations of different approaches:
+
+- **H3**: 
+  - SSM for sequence modeling
+  - Convolution for local processing
+  - Gating for adaptive computation
+
+- **Gated MLP**: 
+  - Optional SSM components
+  - Parallel gating mechanism
+  - Flexible architecture
+
+---
 
 ## Project Structure
 ```
@@ -82,199 +371,72 @@ models/
 │   ├── gated_mlp.py    # Gated MLP implementation
 │   ├── mamba.py        # Mamba implementation
 │   └── transformer.py   # Transformer implementation
-├── layers/             # Core implementations
-│   ├── base.py         # Abstract interface
+├── layers/             # Core layer implementations
+│   ├── base.py         # Abstract base classes
 │   ├── s4_layer.py     # S4 implementation
 │   ├── s4d_layer.py    # S4D implementation
 │   ├── s5_layer.py     # S5 implementation
 │   ├── mamba_layer.py  # Mamba implementation
-│   └── transformer_layer.py  # Transformer implementation
+│   ├── transformer_encoder_layer.py
+│   └── transformer_decoder_layer.py
 └── utils/              # Shared utilities
+    ├── attention.py    # Attention mechanisms
     ├── mlp.py          # MLP components
     ├── conv.py         # Convolution utilities
     └── hippo.py        # HiPPO initialization
 ```
 
-## Setup and Requirements
-
-### Environment Setup
-```bash
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Docker Support
-```bash
-# Build the Docker image
-docker build -t ssm-universal .
-
-# Run with GPU support
-docker run -it --gpus all ssm-universal
-```
-
-## Usage Examples
-
-### Basic Experimentation
-```python
-from state_space_model_universal import create_model
-
-# H3 architecture with S4 layer for language modeling
-model = create_model(
-    architecture="h3",
-    ssm_layer="s4",
-    d_model=256,
-    d_state=64,
-    num_layers=4
-)
-
-# Standard Transformer model
-model = create_model(
-    architecture="transformer",
-    ssm_layer="transformer",
-    d_model=256,
-    num_layers=4,
-    layer_kwargs={
-        "num_heads": 8,
-        "attention_dropout": 0.1
-    }
-)
-```
-
-### Advanced Research Configurations
-```python
-# Mamba with custom initialization for ablation study
-model = create_model(
-    architecture="mamba",
-    ssm_layer="mamba",
-    d_model=256,
-    d_state=16,
-    num_layers=4,
-    layer_kwargs={
-        "init_method": "inv",    # Test S4D initialization
-        "expand_factor": 2       # State space expansion
-    },
-    architecture_kwargs={
-        "d_conv": 4,            # Local context size
-        "dropout": 0.1          # Regularization
-    }
-)
-
-# Transformer with custom attention settings
-model = create_model(
-    architecture="transformer",
-    ssm_layer="transformer",
-    d_model=512,
-    num_layers=6,
-    layer_kwargs={
-        "num_heads": 16,        # Multi-head attention
-        "ffn_ratio": 4,         # Feed-forward expansion
-        "attention_dropout": 0.1
-    }
-)
-
-# Pure MLP baseline comparison
-model = create_model(
-    architecture="gmlp",
-    ssm_layer=None,
-    d_model=256,
-    num_layers=4,
-    architecture_kwargs={
-        "expand_factor": 4,
-        "activation": "gelu"
-    }
-)
-```
-
-### Component-Level Research
-```python
-from state_space_model_universal import (
-    S4Layer, MambaLayer, TransformerLayer,
-    H3Model, TransformerModel
-)
-
-# Experiment with specific SSM configurations
-ssm_layer = S4Layer(
-    d_model=256,
-    d_state=64,
-    dropout=0.1,
-    bidirectional=True,
-    hippo_method="legendre"  # Test different HiPPO variants
-)
-
-# Custom Transformer configuration
-transformer = TransformerLayer(
-    d_model=512,
-    d_state=None,  # Not used in Transformer
-    num_heads=8,
-    attention_dropout=0.1,
-    ffn_ratio=4
-)
-
-# Hybrid architecture experiment
-model = H3Model(
-    ssm_layer_class=TransformerLayer,  # Use Transformer as base layer
-    d_model=256,
-    d_state=64,
-    num_layers=4,
-    layer_kwargs={
-        "num_heads": 8,
-        "attention_dropout": 0.1
-    }
-)
-```
-
-## Model Configuration
-
-### Core Parameters
-- `d_model`: Hidden dimension size (default: 256)
-- `d_state`: State space dimension (default: 64)
-- `num_layers`: Number of stacked layers (default: 4)
-- `max_seq_len`: Maximum sequence length (default: 2048)
-- `dropout`: Dropout rate (default: 0.1)
-
-### Layer-Specific Settings
-- S4Layer:
-  - `bidirectional`: Enable bidirectional processing
-  - `dt_min/dt_max`: Discretization step size bounds
-  - `hippo_method`: HiPPO initialization variant
-
-- S4DLayer:
-  - `init_method`: State matrix initialization ["inv", "lin", "legs"]
-  - `real_transform`: Complex-to-real transformation option
-
-- MambaLayer:
-  - `expand_factor`: State space dimension multiplier
-  - `init_method`: S4D-style initialization options
-
-- TransformerLayer:
-  - `num_heads`: Number of attention heads
-  - `attention_dropout`: Dropout rate for attention weights
-  - `ffn_ratio`: Feed-forward network expansion ratio
+---
 
 ## References
 
-- S4: "Structured State Spaces for Sequence Modeling" (https://arxiv.org/abs/2111.00396)
-  - Introduces the foundational SSM architecture with HiPPO initialization
+### State Space Models
+1. [S4: Structured State Spaces for Sequence Modeling](https://arxiv.org/abs/2111.00396)
+   - Original SSM architecture with HiPPO initialization
+   - Theoretical foundations and empirical results
 
-- S4D: "On the Parameterization and Initialization of Diagonal State Space Models"
-  - Presents efficient diagonal variant with theoretical insights
+2. [S4D: Linear-Time State Space Models with Diagonal State](https://arxiv.org/abs/2206.11893)
+   - Efficient diagonal variant
+   - Improved training dynamics
 
-- S5: "Simplified State Space Layers for Sequence Modeling" (https://arxiv.org/abs/2208.04933)
-  - Optimizes S4 for practical applications
+3. [S5: Simple State Space for Sequence Modeling](https://arxiv.org/abs/2208.04933)
+   - Simplified architecture
+   - Practical improvements
 
-- Mamba: "Mamba: Linear-Time Sequence Modeling with Selective State Spaces" (https://arxiv.org/abs/2312.00752)
-  - Introduces selective state spaces with linear attention
+4. [Mamba: Linear-Time Sequence Modeling with Selective State Spaces](https://arxiv.org/abs/2312.00752)
+   - Selective state space mechanism
+   - Modern architecture improvements
 
-- H3: "H3: Language Modeling with State Space Models and Linear Attention"
-  - Demonstrates SSM effectiveness in language modeling
+### Transformer and Attention
+1. [Attention Is All You Need](https://arxiv.org/abs/1706.03762)
+   - Original Transformer architecture
+   - Multi-head attention mechanism
 
-- Transformer: "Attention Is All You Need" (https://arxiv.org/abs/1706.03762)
-  - Introduces the Transformer architecture
+2. [Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context](https://arxiv.org/abs/1901.02860)
+   - Extended context modeling
+   - Relative position embeddings
+
+---
+
+## Contributing
+
+We welcome contributions! Here's how you can help:
+
+- 🐛 Report bugs and issues
+- 💡 Propose new features
+- 📝 Improve documentation
+- 🔧 Submit pull requests
+
+For major changes, please open an issue first to discuss what you would like to change.
+
+---
 
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+Made with ❤️ by the State Space Model Universal team
+</div>
